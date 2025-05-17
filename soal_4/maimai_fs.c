@@ -18,14 +18,15 @@
 #define ANSI_COLOR_GREEN   "\x1b[32m"
 #define ANSI_COLOR_YELLOW  "\x1b[33m"
 #define ANSI_COLOR_BLUE    "\x1b[34m"
+#define ANSI_COLOR_CYAN    "\x1b[36m"
 #define ANSI_COLOR_RESET   "\x1b[0m"
 
 #define MAX_PATH 1024
 #define MAX_NAME 256
-#define MAX_BUFFER 1048576 // 1MB buffer limit
+#define MAX_BUFFER 1048576 
 
 const char *dirpath = "/home/aryarefman/chiho";
-const char *aes_key = "12345678901234567890123456789012"; // 32 bytes for AES-256
+const char *aes_key = "12345678901234567890123456789012"; 
 
 void log_message(const char *color, const char *format, ...) {
     va_list args;
@@ -56,6 +57,25 @@ void shift_filename(char *name, size_t len, int reverse) {
             name[i] = 'A' + (name[i] - 'A' + shift + 26) % 26;
         }
         if (name[i] == '/' || name[i] == '\0') name[i] = '_';
+    }
+}
+
+void index_encrypt(char *data, size_t len) {
+    if (!data || len == 0) return;
+    for (size_t i = 0; i < len; i++) {
+        data[i] = data[i] + (i % 256); 
+        if (data[i] == ' ') data[i] = '*'; 
+    }
+}
+
+void index_decrypt(char *data, size_t len) {
+    if (!data || len == 0) return;
+    for (size_t i = 0; i < len; i++) {
+        if (data[i] == '*') {
+            data[i] = ' '; 
+        } else {
+            data[i] = data[i] - (i % 256); 
+        }
     }
 }
 
@@ -94,7 +114,7 @@ int get_actual_path(const char *path, char *full_path, size_t full_path_size) {
         if (name_len >= MAX_NAME) return -ENAMETOOLONG;
         strncpy(actual_name, actual_filename, name_len);
         char *dot = strrchr(actual_name, '.');
-        if (dot) *dot = '\0'; // Remove .txt for 7sref mapping
+        if (dot) *dot = '\0'; 
 
         const char *exts[] = {".mai", ".ccc", ".rot", ".bin", ".enc", ".gz", NULL};
         if (strcmp(area, "starter") == 0) {
@@ -104,7 +124,7 @@ int get_actual_path(const char *path, char *full_path, size_t full_path_size) {
         } else if (strcmp(area, "dragon") == 0) {
             snprintf(temp, sizeof(temp), "/dragon/test.txt%s", exts[2]);
         } else if (strcmp(area, "blackrose") == 0) {
-            snprintf(temp, sizeof(temp), "/blackrose/%s%s", actual_name, exts[3]); // Keep original for binary
+            snprintf(temp, sizeof(temp), "/blackrose/%s%s", actual_name, exts[3]); 
         } else if (strcmp(area, "heaven") == 0) {
             snprintf(temp, sizeof(temp), "/heaven/test.txt%s", exts[4]);
         } else if (strcmp(area, "skystreet") == 0 || strcmp(area, "youth") == 0) {
@@ -269,23 +289,45 @@ static int xmp_open(const char *path, struct fuse_file_info *fi) {
 }
 
 static int xmp_getattr(const char *path, struct stat *stbuf, struct fuse_file_info *fi) {
-    char full_path[MAX_PATH];
-    int res = get_actual_path(path, full_path, sizeof(full_path));
-    if (res < 0) {
-        if (strcmp(path, "/") == 0 || strcmp(path, "/7sref") == 0 ||
-            strcmp(path, "/starter") == 0 || strcmp(path, "/metro") == 0 ||
-            strcmp(path, "/dragon") == 0 || strcmp(path, "/blackrose") == 0 ||
-            strcmp(path, "/heaven") == 0 || strcmp(path, "/skystreet") == 0) {
-            stbuf->st_mode = S_IFDIR | 0755;
-            stbuf->st_nlink = 2;
-            return 0;
-        }
-        return res;
+    log_message(ANSI_COLOR_YELLOW, "xmp_getattr called for path: %s", path);
+    memset(stbuf, 0, sizeof(struct stat));
+
+    if (strcmp(path, "/") == 0) {
+        stbuf->st_mode = S_IFDIR | 0755;
+        stbuf->st_nlink = 2;
+        return 0;
     }
 
-    res = lstat(full_path, stbuf);
-    if (res == -1) return -errno;
-    return 0;
+    if (strcmp(path, "/7sref") == 0 ||
+        strcmp(path, "/starter") == 0 || 
+        strcmp(path, "/metro") == 0 || 
+        strcmp(path, "/dragon") == 0 || 
+        strcmp(path, "/blackrose") == 0 || 
+        strcmp(path, "/heaven") == 0 || 
+        strcmp(path, "/skystreet") == 0) {
+        log_message(ANSI_COLOR_GREEN, "Returning attributes for directory: %s", path);
+        stbuf->st_mode = S_IFDIR | 0755;
+        stbuf->st_nlink = 2;
+        return 0;
+    }
+
+    if (strncmp(path, "/7sref/", 7) == 0) {
+        log_message(ANSI_COLOR_GREEN, "Returning attributes for file in 7sref: %s", path);
+        stbuf->st_mode = S_IFREG | 0644;
+        stbuf->st_nlink = 1;
+        stbuf->st_size = 1024; 
+        return 0;
+    }
+
+    char full_path[MAX_PATH];
+    int res = get_actual_path(path, full_path, sizeof(full_path));
+    if (res == 0) {
+        res = lstat(full_path, stbuf);
+        if (res == -1) return -errno;
+        return 0;
+    }
+
+    return -ENOENT;
 }
 
 static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
@@ -307,76 +349,55 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     }
 
     if (strcmp(path, "/7sref") == 0) {
+        log_message(ANSI_COLOR_CYAN, "Populating /7sref directory");
         filler(buf, ".", NULL, 0, 0);
         filler(buf, "..", NULL, 0, 0);
-        
-        // Set up stat for virtual files
         struct stat st = {0};
         st.st_mode = S_IFREG | 0644;
         st.st_nlink = 1;
         st.st_size = 1024;
-        
-        // Create area-specific files
-        char display_name[MAX_NAME];
-        
-        // For each standard area, create the corresponding display file
-        snprintf(display_name, MAX_NAME, "starter_test.txt");
-        if (filler(buf, display_name, &st, 0, 0)) return 0;
-        
-        snprintf(display_name, MAX_NAME, "metro_test.txt");
-        if (filler(buf, display_name, &st, 0, 0)) return 0;
-        
-        snprintf(display_name, MAX_NAME, "dragon_test.txt");
-        if (filler(buf, display_name, &st, 0, 0)) return 0;
-        
-        // Special case for blackrose using actual file name
-        snprintf(display_name, MAX_NAME, "blackrose_firefox.png.txt");
-        if (filler(buf, display_name, &st, 0, 0)) return 0;
-        
-        snprintf(display_name, MAX_NAME, "heaven_test.txt");
-        if (filler(buf, display_name, &st, 0, 0)) return 0;
-        
-        snprintf(display_name, MAX_NAME, "skystreet_test.txt");
-        if (filler(buf, display_name, &st, 0, 0)) return 0;
-        
+        const char *files[] = {
+            "starter_test.txt",
+            "metro_test.txt",
+            "dragon_test.txt",
+            "blackrose_firefox.png.txt",
+            "heaven_test.txt",
+            "skystreet_test.txt",
+            NULL
+        };
+        for (int i = 0; files[i]; i++) {
+            log_message(ANSI_COLOR_YELLOW, "Adding to 7sref: %s", files[i]);
+            filler(buf, files[i], &st, 0, 0);
+        }
         return 0;
     }
-    
-    // Standard area directories
+
     if (strcmp(path, "/starter") == 0 || 
         strcmp(path, "/metro") == 0 || 
         strcmp(path, "/dragon") == 0 || 
         strcmp(path, "/heaven") == 0 || 
         strcmp(path, "/skystreet") == 0) {
-        
         filler(buf, ".", NULL, 0, 0);
         filler(buf, "..", NULL, 0, 0);
-        
-        // Create a default test.txt file for this area
         struct stat st = {0};
         st.st_mode = S_IFREG | 0644;
         st.st_nlink = 1;
         st.st_size = 1024;
-        
-        if (filler(buf, "test.txt", &st, 0, 0)) return 0;
-        return 0;
-    }
-    
-    // Special case for blackrose
-    if (strcmp(path, "/blackrose") == 0) {
-        filler(buf, ".", NULL, 0, 0);
-        filler(buf, "..", NULL, 0, 0);
-        
-        struct stat st = {0};
-        st.st_mode = S_IFREG | 0644;
-        st.st_nlink = 1;
-        st.st_size = 1024;
-        
-        if (filler(buf, "firefox.png", &st, 0, 0)) return 0;
+        filler(buf, "test.txt", &st, 0, 0);
         return 0;
     }
 
-    // If we reach here, the path wasn't handled above, try to look it up in the real filesystem
+    if (strcmp(path, "/blackrose") == 0) {
+        filler(buf, ".", NULL, 0, 0);
+        filler(buf, "..", NULL, 0, 0);
+        struct stat st = {0};
+        st.st_mode = S_IFREG | 0644;
+        st.st_nlink = 1;
+        st.st_size = 1024;
+        filler(buf, "firefox.png", &st, 0, 0);
+        return 0;
+    }
+
     char full_path[MAX_PATH];
     int res = get_actual_path(path, full_path, sizeof(full_path));
     if (res == 0) {
@@ -403,19 +424,14 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
             char *ext = strrchr(display_name, '.');
             if (ext) {
-                *ext = '\0'; // Remove chiho-specific extension
-                
-                // Handle blackrose case specially - keep the original filename
+                *ext = '\0';
                 char *parent_path = strrchr(path, '/');
                 if (parent_path && strcmp(parent_path + 1, "blackrose") == 0) {
-                    // For blackrose, just keep the base name without .bin
-                    // Do nothing special
                 } else {
-                    // For other areas, standardize to test.txt
                     strcpy(display_name, "test.txt");
                 }
             } else {
-                strcpy(display_name, "test.txt"); // Default to test.txt
+                strcpy(display_name, "test.txt");
             }
 
             struct stat st;
@@ -426,7 +442,7 @@ static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
                 continue;
             }
             log_message(ANSI_COLOR_YELLOW, "Listing in %s: %s", path, display_name);
-            if (filler(buf, display_name, &st, 0, 0)) break;
+            filler(buf, display_name, &st, 0, 0);
         }
         closedir(dp);
         return 0;
@@ -472,7 +488,7 @@ static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
             close(fd);
             if (len <= 0) continue;
 
-            if (strcmp(areas[i], "metro") == 0) shift_filename(temp_buf, len, 1);
+            if (strcmp(areas[i], "metro") == 0) index_decrypt(temp_buf, len);
             else if (strcmp(areas[i], "dragon") == 0) rot13(temp_buf, len);
             else if (strcmp(areas[i], "heaven") == 0) {
                 res = aes_decrypt(src_path, temp_buf, len, 0);
@@ -514,7 +530,7 @@ static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
             return -ENOMEM;
         }
         res = pread(fd, temp_buf, size, offset);
-        if (res > 0) shift_filename(temp_buf, res, 1);
+        if (res > 0) index_decrypt(temp_buf, res); 
         memcpy(buf, temp_buf, res);
         free(temp_buf);
         close(fd);
@@ -586,7 +602,7 @@ static int xmp_write(const char *path, const char *buf, size_t size, off_t offse
         char *temp_buf = malloc(size);
         if (!temp_buf) return -ENOMEM;
         memcpy(temp_buf, buf, size);
-        shift_filename(temp_buf, size, 0);
+        index_encrypt(temp_buf, size); 
         int fd = open(full_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
         if (fd == -1) {
             free(temp_buf);
