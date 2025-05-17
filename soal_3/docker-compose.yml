@@ -1,0 +1,33 @@
+version: "3.7"
+
+services:
+  antink-server:
+    build: .
+    container_name: antink-server
+    privileged: true
+    volumes:
+      - ./it24_host:/mnt/original_files   # Bind mount file asli
+      - ./antink-logs:/var/log            # Bind mount log ke /var/log
+    networks:
+      - antink-network
+    cap_add:
+      - SYS_ADMIN
+    devices:
+      - /dev/fuse
+    security_opt:
+      - apparmor:unconfined
+
+  antink-logger:
+    image: alpine
+    container_name: antink-logger
+    volumes:
+      - ./antink-logs:/var/log            # Bind mount log ke /var/log
+    networks:
+      - antink-network
+    depends_on:
+      - antink-server
+    command: sh -c "tail -f /var/log/it24.log"
+
+networks:
+  antink-network:
+    driver: bridge
