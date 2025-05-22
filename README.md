@@ -5,7 +5,7 @@
 The Shorekeeper adalah sebuah entitas misterius yang memimpin dan menjaga Black Shores secara keseluruhan. Karena Shorekeeper hanya berada di Black Shores, ia biasanya berjalan - jalan di sekitar Black Shores untuk mencari anomali - anomali yang ada untuk mencegah adanya kekacauan ataupun krisis di Black Shores. Semenjak kemunculan Fallacy of No Return, ia semakin ketat dalam melakukan pencarian anomali - anomali yang ada di Black Shores untuk mencegah hal yang sama terjadi lagi.
 Suatu hari, saat di Tethys' Deep, Shorekeeper menemukan sebuah anomali yang baru diketahui. Anomali ini berupa sebuah teks acak yang kelihatannya tidak memiliki arti. Namun, ia mempunyai ide untuk mencari arti dari teks acak tersebut.
 
-# A
+#### A
 Pertama, Shorekeeper akan mengambil beberapa sampel anomali teks dari link berikut. Pastikan file zip terhapus setelah proses unzip.
 
 ```bash
@@ -32,7 +32,7 @@ void download_and_unzip() {
     }
 }
 ```
-# B
+#### B
 Setelah melihat teks - teks yang didapatkan, ia menyadari bahwa format teks tersebut adalah hexadecimal. Dengan informasi tersebut, Shorekeeper mencoba untuk mencoba idenya untuk mencari makna dari teks - teks acak tersebut, yaitu dengan mengubahnya dari string hexadecimal menjadi sebuah file image. Bantulah Shorekeeper dengan membuat kode untuk FUSE yang dapat mengubah string hexadecimal menjadi sebuah gambar ketika file text tersebut dibuka di mount directory. Lalu, letakkan hasil gambar yang didapat ke dalam directory bernama “image”.
 
 Library yang digunakan :
@@ -78,7 +78,7 @@ void convert_hex_to_image(const char* txt_path, const char* image_path) {
 }
 
 ```
-# C
+#### C
 Untuk penamaan file hasil konversi dari string ke image adalah [nama file string]_image_[YYYY-mm-dd]_[HH:MM:SS].
 
 ```bash
@@ -121,7 +121,7 @@ void process_txt_files() {
 Hasil output akhir penamaaan:
 ![Image](https://github.com/user-attachments/assets/6f36d4ad-f589-4110-9275-f3615a7e5bd4)
 
-# D
+#### D
 Catat setiap konversi yang ada ke dalam sebuah log file bernama conversion.log. Untuk formatnya adalah sebagai berikut.
 [YYYY-mm-dd][HH:MM:SS]: Successfully converted hexadecimal text [nama file string] to [nama file image].
 
@@ -145,7 +145,7 @@ output akhir log:
 
 ![Image](https://github.com/user-attachments/assets/9b5be427-57d7-43ca-a735-4d56e70042df)
 
-# Library Fuse yang digunakan:
+**Library Fuse yang digunakan:**
 
 ```bash
 static int fs_getattr(const char *path, struct stat *st, struct fuse_file_info *fi) {
@@ -221,7 +221,7 @@ static struct fuse_operations operations = {
 [Author : Icel / wonbunsa]
 Pada suatu hari, seorang ilmuwan muda menemukan sebuah drive tua yang tertanam di reruntuhan laboratorium robotik. Saat diperiksa, drive tersebut berisi pecahan data dari satu-satunya robot perawat legendaris yang dikenal dengan nama Baymax. Sayangnya, akibat kerusakan sistem selama bertahun-tahun, file utuh Baymax telah terfragmentasi menjadi 14 bagian kecil, masing-masing berukuran 1 kilobyte, dan tersimpan dalam direktori bernama relics. Pecahan tersebut diberi nama berurutan seperti Baymax.jpeg.000, Baymax.jpeg.001, hingga Baymax.jpeg.013. Ilmuwan tersebut kini ingin membangkitkan kembali Baymax ke dalam bentuk digital yang utuh, namun ia tidak ingin merusak file asli yang telah rapuh tersebut.
 
-# A
+#### A
 Sebagai asisten teknis, tugasmu adalah membuat sebuah sistem file virtual menggunakan FUSE (Filesystem in Userspace) yang dapat membantu sang ilmuwan. Buatlah sebuah direktori mount bernama bebas (misalnya mount_dir) yang merepresentasikan tampilan Baymax dalam bentuk file utuh Baymax.jpeg. File sistem tersebut akan mengambil data dari folder relics sebagai sumber aslinya.
 ├── mount_dir
 
@@ -255,26 +255,26 @@ void download_and_extract() {
 }
 ```
 
-# B 
+#### B 
 Ketika direktori FUSE diakses, pengguna hanya akan melihat Baymax.jpeg seolah-olah tidak pernah terpecah, meskipun aslinya terdiri dari potongan .000 hingga .013. File Baymax.jpeg tersebut dapat dibaca, ditampilkan, dan disalin sebagaimana file gambar biasa, hasilnya merupakan gabungan sempurna dari keempat belas pecahan tersebut
 
 `baymax_readdir` = menyaring dan menyatukan potongan file menjadi satu nama `Baymax.jpeg`
 `baymax_getattr` = memberikan informasi mahwa `Baymax.jpeg` merupakan file biasadan bukan direktori serta menghitung total ukuran gabungan semua file.
 `baymax_read` = menggabungkan isi semua chunk ke dalam satu buffer seolah mereka adalah satu file utuh
 
-# C
+#### C
 Namun sistem ini harus lebih dari sekadar menyatukan. Jika pengguna membuat file baru di dalam direktori FUSE, maka sistem harus secara otomatis memecah file tersebut ke dalam potongan-potongan berukuran maksimal 1 KB, dan menyimpannya di direktori relics menggunakan format [namafile].000, [namafile].001, dan seterusnya.
 
 `baymax_create` = Dipanggil saat pengguna membuat file baru di direktori fuse, serta membuat file sementara di `/tmp` untuk menampung isi file sementara sebelum dipecah.
 `baymax_write` = Saat pengguna menulis isi file ke dalam fuse, pengguna akan menulisnya dulu ke `/tmp` lalu baru menyalurkannya ke fuse.
 `baymax_flush` = berfungsi sebagai pemrosesan akhir. File yang telah ditulis sebelumnya akan dibaa ulang, lalu dipecah menjadi potongan 1 kb lalu disimpan di `/relics` sebagai `Baymax.jpeg.0XX`
 
-# D
+#### D
 Ketika file tersebut dihapus dari direktori mount, semua pecahannya di relics juga harus ikut dihapus.
 
 `baymax_unlink` = dipanggil saat pengguna menghapus ile di direktori mount FUSE, misalkan saat menggunakan perintah `rm Baymax.jpeg`
 
-# E
+#### E
 
 Untuk keperluan analisis ilmuwan, sistem juga harus mencatat seluruh aktivitas pengguna dalam sebuah file log bernama activity.log yang disimpan di direktori yang sama. Aktivitas yang dicatat antara lain:
 Membaca file (misalnya membuka baymax.png)
